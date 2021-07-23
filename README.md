@@ -36,8 +36,7 @@ export STORAGE_ACCOUNT_NAME=largefilessa
 
 # Container Instance
 export ACR_REGISTRY_NAME=packagefiles
-export ACR_PASSWORD=<replace password>
-export ACR_USER=largefileuser
+export ACR_USER=sp_largefileuser
 export CONTAINER_IMAGE_NAME=packagefiles
 
 # Function App
@@ -72,23 +71,50 @@ az acr create --resource-group $RG_NAME --name $CONTAINER_NAME --sku Basic
 ### Build and Upload Docker Image
 
 ```bash
- docker build --pull --rm -f "dockerfile" -t "{$CONTAINER_IMAGE_NAME}:latest" "."
- docker tag "{$CONTAINER_IMAGE_NAME}:latest" "{$ACR_REGISTRY_NAME}.azurecr.io/{$CONTAINER_IMAGE_NAME}:v1"
+#Build image
+ docker build --pull --rm -f "dockerfile" -t $CONTAINER_IMAGE_NAME:latest "."
 
- az acr login --name $ACR_REGISTRY_NAME
- docker push "{$ACR_REGISTRY_NAME}.azurecr.io/{$CONTAINER_IMAGE_NAME}:v1"
+#Tag
+docker tag $CONTAINER_IMAGE_NAME:latest $ACR_REGISTRY_NAME.azurecr.io/$CONTAINER_IMAGE_NAME:latest
 
- ```
+# Push to Registry
+az acr login --name $ACR_REGISTRY_NAME
+docker push $ACR_REGISTRY_NAME.azurecr.io/$CONTAINER_IMAGE_NAME:latest
+```
+
+### Service Principal
+
+```bash
+# Create identity
+az ad sp create-for-rbac --name $ACR_USER --skip-assignment --sdk-auth > local-sp.json
+
+# Create the role assignment
+ACR_REGISTRY_ID=$(az acr show --name $ACR_REGISTRY_NAME  --query id --output tsv)
+ACR_USER_ID=$(cat local-sp.json | grep clientId | awk -F\" '{print $4}')
+
+az role assignment create --assignee $ACR_USER_ID  --scope $ACR_REGISTRY_ID --role acrpull
+
+```
+
 
 ### Function App
 
 Create a function app using a Private ACR image.
 
 ```bash
-az functionapp create -g $RG_NAME -p $FX_PLAN_NAME -n $FX_NAME --runtime $FX_RUNTIME --storage-account $STORAGE_ACCOUNT_NAME --deployment-container-image-name "{$ACR_REGISTRY_NAME}.azurecr.io/{$CONTAINER_IMAGE_NAME}:latest" --docker-registry-server-password $ACR_PASSWORD --docker-registry-server-user $ACR_USER
+ACR_PASSWORD=$(cat local-sp.json | grep clientSecret | awk -F\" '{print $4}')
+
+az functionapp plan create -g $RG_NAME -n $FX_PLAN_NAME --min-instances 1 --max-burst 3 --sku EP1
+
+az functionapp create -n $FX_NAME -g $RG_NAME -s $STORAGE_ACCOUNT_NAME --plan $FX_PLAN_NAME  --deployment-container-image-name $ACR_REGISTRY_NAME.azurecr.io/$CONTAINER_IMAGE_NAME:latest --docker-registry-server-password $ACR_PASSWORD --docker-registry-server-user $ACR_USER --functions-version 3 --os-type=Linux
 ```
+
 
 # References
 
+- Dev Setup - Azure CLI https://docs.microsoft.com/en-us/cli/azure/install-azure-cli-linux?pivots=apt
+- Dev Setup - VS Code on Windows WSL - https://docs.microsoft.com/en-us/windows/wsl/tutorials/wsl-vscode
 - Azure Function App CLI docs https://docs.microsoft.com/en-us/cli/azure/functionapp?view=azure-cli-latest
 - Python Azure SDK Storage https://docs.microsoft.com/en-us/azure/developer/python/azure-sdk-example-storage-use?tabs=cmd
+- Azure Function Deployments https://docs.microsoft.com/en-us/azure/azure-functions/functions-deployment-technologies
+- Azure Functions on a Custom Container https://docs.microsoft.com/bs-latn-ba/Azure/azure-functions/functions-create-function-linux-custom-image?tabs=bash%2Cportal&pivots=programming-language-python
