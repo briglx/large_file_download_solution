@@ -96,7 +96,6 @@ az role assignment create --assignee $ACR_USER_ID  --scope $ACR_REGISTRY_ID --ro
 
 ```
 
-
 ### Function App
 
 Create a function app using a Private ACR image.
@@ -104,11 +103,72 @@ Create a function app using a Private ACR image.
 ```bash
 ACR_PASSWORD=$(cat local-sp.json | grep clientSecret | awk -F\" '{print $4}')
 
-az functionapp plan create -g $RG_NAME -n $FX_PLAN_NAME --min-instances 1 --max-burst 3 --sku EP1
+az functionapp plan create -g $RG_NAME -n $FX_PLAN_NAME --min-instances 1 --max-burst 3 --sku EP1 --is-linux true
 
-az functionapp create -n $FX_NAME -g $RG_NAME -s $STORAGE_ACCOUNT_NAME --plan $FX_PLAN_NAME  --deployment-container-image-name $ACR_REGISTRY_NAME.azurecr.io/$CONTAINER_IMAGE_NAME:latest --docker-registry-server-password $ACR_PASSWORD --docker-registry-server-user $ACR_USER --functions-version 3 --os-type=Linux
+az functionapp create -n $FX_NAME -g $RG_NAME -s $STORAGE_ACCOUNT_NAME --plan $FX_PLAN_NAME --runtime python  --runtime-version 3.7 --deployment-container-image-name $ACR_REGISTRY_NAME.azurecr.io/$CONTAINER_IMAGE_NAME:latest --docker-registry-server-password $ACR_PASSWORD --docker-registry-server-user $ACR_USER_ID --functions-version 3 --os-type=Linux
 ```
 
+# Development
+
+Setup your dev environment by creating a virtual environment
+
+```bash
+# virtualenv \path\to\.venv -p path\to\specific_version_python.exe
+python -m venv .venv.
+source .venv\scripts\activate
+
+deactivate
+```
+
+## Style Guidelines
+
+This project enforces quite strict [PEP8](https://www.python.org/dev/peps/pep-0008/) and [PEP257 (Docstring Conventions)](https://www.python.org/dev/peps/pep-0257/) compliance on all code submitted.
+
+We use [Black](https://github.com/psf/black) for uncompromised code formatting.
+
+Summary of the most relevant points:
+
+- Comments should be full sentences and end with a period.
+- [Imports](https://www.python.org/dev/peps/pep-0008/#imports) should be ordered.
+- Constants and the content of lists and dictionaries should be in alphabetical order.
+- It is advisable to adjust IDE or editor settings to match those requirements.
+
+
+### Use new style string formatting
+
+Prefer [f-strings](https://docs.python.org/3/reference/lexical_analysis.html#f-strings) over ``%`` or ``str.format``.
+
+```python
+#New
+f"{some_value} {some_other_value}"
+# Old, wrong
+"{} {}".format("New", "style")
+"%s %s" % ("Old", "style")
+```
+
+One exception is for logging which uses the percentage formatting. This is to avoid formatting the log message when it is suppressed.
+
+```python
+_LOGGER.info("Can't connect to the webservice %s at %s", string1, string2)
+```
+
+### Testing
+You'll need to install the test dependencies into your Python environment:
+
+```bash
+pip3 install -r requirements_dev.txt
+```
+
+Now that you have all test dependencies installed, you can run linting and tests on the project:
+
+```bash
+isort .
+codespell  --skip=".venv"
+black LocalFunctionsProject
+flake8 LocalFunctionsProject
+pylint LocalFunctionsProject
+pydocstyle LocalFunctionsProject
+```
 
 # References
 
@@ -117,4 +177,5 @@ az functionapp create -n $FX_NAME -g $RG_NAME -s $STORAGE_ACCOUNT_NAME --plan $F
 - Azure Function App CLI docs https://docs.microsoft.com/en-us/cli/azure/functionapp?view=azure-cli-latest
 - Python Azure SDK Storage https://docs.microsoft.com/en-us/azure/developer/python/azure-sdk-example-storage-use?tabs=cmd
 - Azure Function Deployments https://docs.microsoft.com/en-us/azure/azure-functions/functions-deployment-technologies
-- Azure Functions on a Custom Container https://docs.microsoft.com/bs-latn-ba/Azure/azure-functions/functions-create-function-linux-custom-image?tabs=bash%2Cportal&pivots=programming-language-python
+- Azure Functions on a Custom Container https://docs.microsoft.com/en-us/Azure/azure-functions/functions-create-function-linux-custom-image?tabs=bash%2Cportal&pivots=programming-language-python
+- Azure Functions Supported Docker Base https://hub.docker.com/_/microsoft-azure-functions-base

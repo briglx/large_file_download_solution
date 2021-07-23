@@ -1,1 +1,23 @@
+# Python Environments
+.env
+.venv
+env/
+venv/
+ENV/
+env.bak/
+venv.bak/
+
+# VSCode
+.vscode/extensions.json
+.vscode/launch.json
+.vscode/tasks.json
+
+# Project specific files
 local-sp.json
+local.env
+.vscode/settings.json
+local-sp.json
+
+
+functions/.funcignore
+functions/.gitignore
